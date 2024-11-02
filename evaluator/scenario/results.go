@@ -11,7 +11,7 @@ type ScenarioResult struct {
 	Submits []ScenarioSubmitResult
 }
 
-type ExpectationResult struct {
+type AssertionResult struct {
 	Ok bool
 	Error string
 }
@@ -19,7 +19,7 @@ type ExpectationResult struct {
 type ScenarioSubmitResult struct {
 	Submit int  `json:"submit"`
 	Errors  []ScenarioError `json:"errors"`
-	Expects []ExpectationResult `json:"expectations"`
+	Asserts []AssertionResult `json:"assertions"`
 	State *types.ParticipantState // Final state of participant
 	FlagsChanges map[string]int
 }

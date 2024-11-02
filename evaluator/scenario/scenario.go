@@ -21,7 +21,7 @@ type SubmitResponse struct {
 	File string `json:"file"`
 	Time string
 	Response *types.SurveyResponse
-	Expectations []string `json:"expect"`
+	Assertions []string `json:"asserts"`
 }
 
 type Scenario struct {
@@ -74,15 +74,16 @@ func Load(file string) (*Scenario, error) {
 	return &scenario, nil
 }
 
-func createExpectationEnv(flags map[string]string) map[string]any {
+func createAssertionEnv(state types.ParticipantState, previousState types.ParticipantState) map[string]any {
 	return map[string]any {
-		"flags": flags,
+		"previousState": previousState,
+		"state": state,
 	}
 }
 
 
-func evalExpectation(expectation string, env map[string]any) (bool, error) {
-	program, err := expr.Compile(expectation, expr.Env(env), expr.AsBool())
+func evalAssertion(assertion string, env map[string]any) (bool, error) {
+	program, err := expr.Compile(assertion, expr.Env(env), expr.AsBool())
 	if err != nil {
 		return false, err
 	}
@@ -101,6 +102,7 @@ func (sc *Scenario) Run(evaluator *engine.RuleEvaluator) *ScenarioResult {
 		submitError := false
 		fmt.Printf("= Submit %d\n", idx)
 		evalResult := evaluator.Submit(state, *submit.Response)
+		previousState := state
 		if(evalResult.HasError) {
 			fmt.Println("Errors found")
 			for _, ss := range evalResult.States {
@@ -117,13 +119,13 @@ func (sc *Scenario) Run(evaluator *engine.RuleEvaluator) *ScenarioResult {
 
 			state = last.Data.PState
 
-			env := createExpectationEnv(state.Flags)
+			env := createAssertionEnv(state, previousState)
 
-			submitResult.Expects = make([]ExpectationResult, 0, len(submit.Expectations))
+			submitResult.Asserts = make([]AssertionResult, 0, len(submit.Assertions))
 
-			for _, expectation := range submit.Expectations {
-				b, err := evalExpectation(expectation, env)
-				submitResult.Expects = append(submitResult.Expects, ExpectationResult{Ok: b, Error: errAsString(err), } )
+			for _, expectation := range submit.Assertions {
+				b, err := evalAssertion(expectation, env)
+				submitResult.Asserts = append(submitResult.Asserts, AssertionResult{Ok: b, Error: errAsString(err), } )
 			}
 			submitResult.State = &state
 		}
@@ -148,9 +150,9 @@ func (sc *Scenario) PrintResult(r *ScenarioResult) {
 			fmt.Println("  Flags")
 			printFlagsWithChange(submit.State.Flags, submit.FlagsChanges, 4)
 		}
-		if(len(submit.Expects) > 0) {
-			fmt.Println("   Expectations")
-			printExpectations(submitDef.Expectations, submit.Expects, 4)
+		if(len(submit.Asserts) > 0) {
+			fmt.Println("   Assertions")
+			printAssertions(submitDef.Assertions, submit.Asserts, 4)
 		}
 	}
 }
@@ -185,9 +187,9 @@ func printFlagsWithChange(flags map[string]string, changes map[string]int, inden
 	}
 }
 
-func printExpectations(definitions []string, expects []ExpectationResult, indent int) {
+func printAssertions(definitions []string, asserts []AssertionResult, indent int) {
 	prefix := strings.Repeat(" ", indent)
-	for idx, r := range expects {
+	for idx, r := range asserts {
 		def := definitions[idx]
 		if(r.Error != "") {
 			color.Red("%s- `%s` <error> %s)\n", prefix, def, r.Error)
