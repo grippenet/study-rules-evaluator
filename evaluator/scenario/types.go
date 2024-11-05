@@ -30,6 +30,7 @@ type SubmitResponse struct {
 
 type Scenario struct {
 	Time string  `json:"time"` // The base time of the scenario 
+	Label string `json:"label"` // Label to show results
 	State  types.ParticipantState `json:"state"`
 	Submits []SubmitResponse `json:"submits"`
 	startTime time.Time // parsed Time

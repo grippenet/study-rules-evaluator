@@ -17,9 +17,9 @@ import(
 	"github.com/expr-lang/expr"
 )
 
-func readScenarioFromJSON(file string) (Scenario, error) {
+func readScenarioFromJSON(file string) ([]Scenario, error) {
 	content, err := os.ReadFile(file)
-	var input Scenario
+	var input []Scenario
 	if err != nil {
 		return input, err
 	}
@@ -27,13 +27,23 @@ func readScenarioFromJSON(file string) (Scenario, error) {
 	return input, err
 }
 
-
-func Load(file string) (*Scenario, error) {
-	scenario, err := readScenarioFromJSON(file)
+func Load(file string) ([]Scenario, error) {
+	scenarios, err := readScenarioFromJSON(file)
 	if err != nil {
 		return nil, err
 	}
 	dir := filepath.Dir(file)
+	for idx, _ := range scenarios {
+		sc := &scenarios[idx]
+		err = initScenario(sc, dir)
+		if(err != nil) {
+			return nil, errors.Join( fmt.Errorf("Error in entry %d of '%s'", idx, file), err)
+		}
+	}
+	return scenarios, err
+}
+
+func initScenario(scenario *Scenario, dir string) error {
 	for i, _ := range scenario.Submits {
 		sb := &scenario.Submits[i]
 		if(sb.Data != nil) {
@@ -43,16 +53,16 @@ func Load(file string) (*Scenario, error) {
 			fn := filepath.Join(dir, sb.File)
 			data, err := response.ReadSurveyResponseFromJSON(fn)
 			if err != nil {
-				return nil, errors.Join(fmt.Errorf("Error loading file in submit %d", i), err)
+				return errors.Join(fmt.Errorf("Error loading file in submit %d", i), err)
 			}
 			sb.Response = response.ToSurveyResponse(data)
 		}
 		if(sb.Response == nil) {
-			return nil, fmt.Errorf("No response provided for submit %d", i)
+			return fmt.Errorf("No response provided for submit %d", i)
 		}
 	}
-	err = scenario.Init()
-	return &scenario, err
+	err := scenario.Init()
+	return err
 }
 
 func createAssertionEnv(state types.ParticipantState, previousState types.ParticipantState) map[string]any {

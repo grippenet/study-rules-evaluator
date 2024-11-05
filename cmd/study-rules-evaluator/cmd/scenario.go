@@ -25,18 +25,19 @@ var scenarioCmd = &cobra.Command{
       log.Fatalf("Unable to read rules : %s", err)
     }
 
-    scenar, err := scenario.Load(scenarioFile)
+    scenarios, err := scenario.Load(scenarioFile)
     if(err != nil) {
-      fmt.Println("Error loading scenario :", err)
+      fmt.Println("Error loading scenarios in %s :", scenarioFile,  err)
       return
     }
-    fmt.Println(scenar)
-
-    evaluator := engine.NewRuleEvaluator(nil, studyRules)
-    //evaluator.Verbose = true
-    result := scenar.Run(evaluator)
-
-    scenar.PrintResult(result)
-
+    
+    for idx, scenario := range scenarios {
+      evaluator := engine.NewRuleEvaluator(nil, studyRules)
+      //evaluator.Verbose = true
+      result := scenario.Run(evaluator)
+      fmt.Printf("Scenario %d %s\n", idx, scenario.Label)
+      scenario.PrintResult(result)  
+    }
+    
   },
 }
