@@ -70,7 +70,7 @@ func (ev *RuleEvaluator) Submit(initialState types.ParticipantState, response ty
 
 		r := EvalResult{
 			Index: index,
-			Data: newState,
+			Data: CloneActionData(newState),
 		}
 
 		if(err != nil) {
