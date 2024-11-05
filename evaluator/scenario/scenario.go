@@ -10,24 +10,12 @@ import(
 	"path/filepath"
 	"github.com/fatih/color"
 	"github.com/influenzanet/study-service/pkg/types"
+	"github.com/influenzanet/study-service/pkg/studyengine"
 	"github.com/grippenet/study-rules-evaluator/evaluator/engine"
 	"github.com/grippenet/study-rules-evaluator/evaluator/response"
 	"github.com/grippenet/study-rules-evaluator/evaluator/change"
 	"github.com/expr-lang/expr"
 )
-
-type SubmitResponse struct {
-	Data *response.JsonSurveyResponse `json:"data"`
-	File string `json:"file"`
-	Time string
-	Response *types.SurveyResponse
-	Assertions []string `json:"asserts"`
-}
-
-type Scenario struct {
-	State  types.ParticipantState `json:"state"`
-	Submits []SubmitResponse `json:"submits"` 	
-}
 
 func readScenarioFromJSON(file string) (Scenario, error) {
 	content, err := os.ReadFile(file)
@@ -62,16 +50,9 @@ func Load(file string) (*Scenario, error) {
 		if(sb.Response == nil) {
 			return nil, fmt.Errorf("No response provided for submit %d", i)
 		}
-		if sb.Time != "" {
-			time, err := time.Parse("2006-01-02T15:04:05", sb.Time)
-			if err != nil {
-				return nil, errors.Join(fmt.Errorf("Unable to parse time in submit %d", i), err)
-			}
-			sb.Response.SubmittedAt = time.Unix()
-			sb.Response.ArrivedAt = time.Unix()
-		} 
 	}
-	return &scenario, nil
+	err = scenario.Init()
+	return &scenario, err
 }
 
 func createAssertionEnv(state types.ParticipantState, previousState types.ParticipantState) map[string]any {
@@ -80,7 +61,6 @@ func createAssertionEnv(state types.ParticipantState, previousState types.Partic
 		"state": state,
 	}
 }
-
 
 func evalAssertion(assertion string, env map[string]any) (bool, error) {
 	program, err := expr.Compile(assertion, expr.Env(env), expr.AsBool())
@@ -94,15 +74,58 @@ func evalAssertion(assertion string, env map[string]any) (bool, error) {
 	return output.(bool), nil
 }
 
+// Init parse & performs checks before the scenario is run
+func (sc *Scenario) Init() error {
+	var err error
+	if(sc.Time == "") {
+		sc.startTime = time.Now()
+	} else {
+		sc.startTime, err = time.Parse(FixedTimeLayout, sc.Time)
+		if err != nil {
+			return errors.Join(errors.New("Unable to parse scenario.Time field"), err)
+		}
+	}
+	// Check submit fields are parseable
+	for idx, _ := range sc.Submits {
+		sb := &sc.Submits[idx]
+		err := sb.Init()
+		if err != nil {
+			return errors.Join(fmt.Errorf("Error in submit %d", idx), err)
+		}
+	}
+	return nil
+}
+
 func (sc *Scenario) Run(evaluator *engine.RuleEvaluator) *ScenarioResult {
 	state := sc.State
 	result := &ScenarioResult{Count: len(sc.Submits), Submits: make([]ScenarioSubmitResult, 0, len(sc.Submits))}
-	for idx, submit := range sc.Submits {
-		submitResult := ScenarioSubmitResult{Submit: idx, Errors: make([]ScenarioError, 0), }
+
+	now := sc.startTime
+	for idx, _ := range sc.Submits {
+
+		submit := &sc.Submits[idx]
+
+		now = submit.ShiftTime(now)
+
+		// Change study engine current time
+		studyengine.Now = func() time.Time {
+			return now
+		}
+
+		submitResult := ScenarioSubmitResult{Submit: idx, Errors: make([]ScenarioError, 0), Time: now, }
 		submitError := false
-		fmt.Printf("= Submit %d\n", idx)
-		evalResult := evaluator.Submit(state, *submit.Response)
+		
+		fmt.Printf("= Submit %d '%s' at %s\n", idx, submit.Response.Key, now)
+
+		u := now.Unix()
+		submit.Response.OpenedAt = u - int64(submit.FillingDuration)
+		submit.Response.SubmittedAt = u
+		submit.Response.ArrivedAt = u
+
 		previousState := state
+		
+		evalResult := evaluator.Submit(state, *submit.Response)
+
 		if(evalResult.HasError) {
 			fmt.Println("Errors found")
 			for _, ss := range evalResult.States {
@@ -112,6 +135,9 @@ func (sc *Scenario) Run(evaluator *engine.RuleEvaluator) *ScenarioResult {
 		}
 		if(!submitError) {
 			last := evalResult.Last()
+
+			//fmt.Println("Eval");
+			//fmt.Printf("%+v\n", last.Data.PState.Flags);
 
 			flagsChanges := change.CompareMap(state.Flags, last.Data.PState.Flags)
 
@@ -127,18 +153,21 @@ func (sc *Scenario) Run(evaluator *engine.RuleEvaluator) *ScenarioResult {
 				b, err := evalAssertion(expectation, env)
 				submitResult.Asserts = append(submitResult.Asserts, AssertionResult{Ok: b, Error: errAsString(err), } )
 			}
-			submitResult.State = &state
+			// Clone the state to be sure we keep map values as is
+			rState := engine.CloneParticipantState(state)
+			submitResult.State = &rState
 		}
 		result.HasError = result.HasError || len(submitResult.Errors) > 0 
 		result.Submits = append(result.Submits, submitResult)
 	}
+
 	return result
 }
 
 func (sc *Scenario) PrintResult(r *ScenarioResult) {
 	fmt.Printf("Scenario submits %d / %d\n", len(r.Submits), r.Count)
 	for idx, submit := range r.Submits {
-		fmt.Printf(" > Submit %d ==> \n", idx)
+		fmt.Printf(" > Submit %d at '%s' ==> \n", idx, submit.Time.Format("2006-02-01 15:04:05"))
 		submitDef := sc.Submits[idx]
 		if(len(submit.Errors) > 0) {
 			fmt.Println("  Errors: ")
