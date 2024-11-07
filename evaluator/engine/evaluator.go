@@ -11,25 +11,29 @@ import (
 )
 
 type RuleEvaluator struct {
-	Data []types.SurveyResponse
+	DbService *MemoryDBService
+	ExternalServiceConfigs []types.ExternalService
 	Rules []types.Expression
 	Verbose bool
 }
 
-
-func NewRuleEvaluator(previousData []types.SurveyResponse, rules []types.Expression) *RuleEvaluator {
-	if(previousData == nil) {
-		previousData = make([]types.SurveyResponse, 0, 0)
+func NewRuleEvaluator(DbService *MemoryDBService, rules []types.Expression) *RuleEvaluator {
+	return &RuleEvaluator{
+		DbService: DbService, 
+		Rules: rules, 
+		ExternalServiceConfigs: nil,
 	}
-	return &RuleEvaluator{Data: previousData, Rules: rules}
 }
 
+func (ev *RuleEvaluator) WithExternalServices(externals []types.ExternalService) {
+	ev.ExternalServiceConfigs = externals
+}
 
 func (ev *RuleEvaluator) Submit(initialState types.ParticipantState, response types.SurveyResponse) EvaluationResult {
 	instanceID := "dummy"
 	studyKey := "dummy"
 	
-	dbService := MemoryDBService{Data: ev.Data}
+	dbService := ev.DbService
 	
 	event := types.StudyEvent{
 		InstanceID:                            instanceID,
@@ -46,7 +50,7 @@ func (ev *RuleEvaluator) Submit(initialState types.ParticipantState, response ty
 
 	actionConfig := studyengine.ActionConfigs{
 		DBService:            dbService ,
-		ExternalServiceConfigs: nil,
+		ExternalServiceConfigs: ev.ExternalServiceConfigs,
 	}
 
 	results := make([]EvalResult, 0)
@@ -86,8 +90,16 @@ func (ev *RuleEvaluator) Submit(initialState types.ParticipantState, response ty
 
 		results = append(results, r )
 
-		actionData.PState = newState.PState
+		actionData = newState
 	}
+
+	if(len(actionData.ReportsToCreate) > 0) {
+		for _, report := range actionData.ReportsToCreate {
+			dbService.SaveReport(instanceID, studyKey, report)
+		}
+	}
+
+	dbService.AddSurveyResponse(instanceID, studyKey, response)
 
 	logger.Debug = oldLogger
 

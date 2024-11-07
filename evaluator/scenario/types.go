@@ -57,6 +57,7 @@ type ScenarioSubmitResult struct {
 	Errors  []ScenarioError `json:"errors"`
 	Asserts []AssertionResult `json:"assertions"`
 	State *types.ParticipantState // Final state of participant
+	Reports map[string]types.Report `json:"reports"` // Reports created after the submission
 	FlagsChanges map[string]int
 }
 

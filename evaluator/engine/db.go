@@ -3,11 +3,35 @@ package engine
 import(
 	"github.com/influenzanet/study-service/pkg/dbs/studydb"
 	"github.com/influenzanet/study-service/pkg/types"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"sort"
 )
 
 type MemoryDBService struct {
 	Data []types.SurveyResponse
+	Reports []types.Report
+	Messages []types.StudyMessage
+}
+
+func NewMemoryDBService() *MemoryDBService {
+	return &MemoryDBService{
+		Data: make([]types.SurveyResponse, 0),
+		Reports: make([]types.Report, 0),
+		Messages: make([]types.StudyMessage, 0),
+	}
+}
+
+func (dbService *MemoryDBService) AddSurveyResponse(instanceID string, studyKey string, response types.SurveyResponse) (string, error) {
+	id := primitive.NewObjectID()
+	response.ID = id
+	dbService.Data = append(dbService.Data, response)
+	return id.Hex(), nil
+}
+
+func (dbService *MemoryDBService) SaveReport(instanceID string, studyKey string, report types.Report) error {
+	report.ID = primitive.NewObjectID()
+	dbService.Reports = append(dbService.Reports, report)
+	return nil
 }
 
 func (m MemoryDBService) FindSurveyResponses(instanceID string, studyKey string, query studydb.ResponseQuery) (responses []types.SurveyResponse, err error) {

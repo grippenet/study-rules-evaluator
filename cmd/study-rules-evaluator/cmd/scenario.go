@@ -5,7 +5,6 @@ import (
   "log"
   "github.com/spf13/cobra"
    "github.com/grippenet/study-rules-evaluator/evaluator/scenario"
-  "github.com/grippenet/study-rules-evaluator/evaluator/engine"
 )
 
 func init() {
@@ -32,9 +31,7 @@ var scenarioCmd = &cobra.Command{
     }
     
     for idx, scenario := range scenarios {
-      evaluator := engine.NewRuleEvaluator(nil, studyRules)
-      //evaluator.Verbose = true
-      result := scenario.Run(evaluator)
+      result := scenario.Run(studyRules)
       fmt.Printf("Scenario %d %s\n", idx, scenario.Label)
       scenario.PrintResult(result)  
     }

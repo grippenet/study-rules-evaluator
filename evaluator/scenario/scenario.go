@@ -65,14 +65,22 @@ func initScenario(scenario *Scenario, dir string) error {
 	return err
 }
 
-func createAssertionEnv(state types.ParticipantState, previousState types.ParticipantState) map[string]any {
-	return map[string]any {
-		"previousState": previousState,
-		"state": state,
-	}
+type AssertionEnv struct {
+	state types.ParticipantState
+	previousState types.ParticipantState
+	reports map[string]types.Report
+	submitAt time.Time
 }
 
-func evalAssertion(assertion string, env map[string]any) (bool, error) {
+func evalAssertion(assertion string, data AssertionEnv) (bool, error) {
+	
+	env := map[string]any {
+		"previousState": data.previousState,
+		"state": data.state,
+		"reports": data.reports,
+		"submitAt": data.submitAt,
+	}
+	
 	program, err := expr.Compile(assertion, expr.Env(env), expr.AsBool())
 	if err != nil {
 		return false, err
@@ -106,10 +114,15 @@ func (sc *Scenario) Init() error {
 	return nil
 }
 
-func (sc *Scenario) Run(evaluator *engine.RuleEvaluator) *ScenarioResult {
+func (sc *Scenario) Run(studyRules []types.Expression) *ScenarioResult {
 	state := sc.State
 	result := &ScenarioResult{Count: len(sc.Submits), Submits: make([]ScenarioSubmitResult, 0, len(sc.Submits))}
 
+	dbService := engine.NewMemoryDBService()
+
+	evaluator := engine.NewRuleEvaluator(dbService, studyRules)
+	//evaluator.Verbose = true
+	
 	now := sc.startTime
 	for idx, _ := range sc.Submits {
 
@@ -155,17 +168,23 @@ func (sc *Scenario) Run(evaluator *engine.RuleEvaluator) *ScenarioResult {
 
 			state = last.Data.PState
 
-			env := createAssertionEnv(state, previousState)
-
+			assertionEnv := AssertionEnv{
+				state: state, 
+				previousState: previousState,
+				reports: last.Data.ReportsToCreate,
+				submitAt: now,
+			}
+			
 			submitResult.Asserts = make([]AssertionResult, 0, len(submit.Assertions))
 
 			for _, expectation := range submit.Assertions {
-				b, err := evalAssertion(expectation, env)
+				b, err := evalAssertion(expectation, assertionEnv)
 				submitResult.Asserts = append(submitResult.Asserts, AssertionResult{Ok: b, Error: errAsString(err), } )
 			}
 			// Clone the state to be sure we keep map values as is
 			rState := engine.CloneParticipantState(state)
 			submitResult.State = &rState
+			submitResult.Reports = last.Data.ReportsToCreate
 		}
 		result.HasError = result.HasError || len(submitResult.Errors) > 0 
 		result.Submits = append(result.Submits, submitResult)
@@ -176,6 +195,7 @@ func (sc *Scenario) Run(evaluator *engine.RuleEvaluator) *ScenarioResult {
 
 func (sc *Scenario) PrintResult(r *ScenarioResult) {
 	fmt.Printf("Scenario submits %d / %d\n", len(r.Submits), r.Count)
+	indent := 4
 	for idx, submit := range r.Submits {
 		fmt.Printf(" > Submit %d at '%s' ==> \n", idx, submit.Time.Format("2006-02-01 15:04:05"))
 		submitDef := sc.Submits[idx]
@@ -187,12 +207,38 @@ func (sc *Scenario) PrintResult(r *ScenarioResult) {
 		}
 		if(submit.State != nil) {
 			fmt.Println("  Flags")
-			printFlagsWithChange(submit.State.Flags, submit.FlagsChanges, 4)
+			printFlagsWithChange(submit.State.Flags, submit.FlagsChanges, indent)
+		}
+		if(len(submit.Reports) > 0) {
+			fmt.Println("  Reports")
+			printReports(submit.Reports, indent)
+			//fmt.Println(submit.Reports)		
 		}
 		if(len(submit.Asserts) > 0) {
-			fmt.Println("   Assertions")
-			printAssertions(submitDef.Assertions, submit.Asserts, 4)
+			fmt.Println("  Assertions")
+			printAssertions(submitDef.Assertions, submit.Asserts, indent)
 		}
+	}
+}
+
+func reportToString(report types.Report ) string {
+	var sb strings.Builder
+	t := time.Unix(report.Timestamp, 0)
+	sb.WriteString(t.Format(FixedTimeLayout))
+	for _, d := range report.Data {
+		var dtype string
+		if(d.Dtype != "") {
+			dtype = fmt.Sprintf("[%s]", d.Dtype)
+		}
+		sb.WriteString(fmt.Sprintf(" `%s`%s=%s", d.Key, dtype, d.Value))
+	}
+	return sb.String()
+}
+
+func printReports(reports map[string]types.Report, indent int) {
+	prefix := strings.Repeat(" ", indent)
+	for key, report := range reports {
+		fmt.Printf("%s- `%s` : %s\n", prefix, key, reportToString(report))
 	}
 }
 
