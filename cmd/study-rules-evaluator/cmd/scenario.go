@@ -1,40 +1,54 @@
 package cmd
 
 import (
+  "os"
   "fmt"
-  "log"
+  "errors"
   "github.com/spf13/cobra"
-   "github.com/grippenet/study-rules-evaluator/evaluator/scenario"
+  "github.com/grippenet/study-rules-evaluator/evaluator"
+  "github.com/grippenet/study-rules-evaluator/evaluator/scenario"
 )
 
 func init() {
+  // Default get from env
   rootCmd.AddCommand(scenarioCmd)
-  scenarioCmd.Flags().StringVar(&scenarioFile, "file", "", " Scenario file")
+  scenarioCmd.Flags().StringVar(&scenarioFile, "file", "", "Scenario file")
+  scenarioCmd.Flags().StringVar(&externalServicesFile, "externals", os.Getenv("EXTERNAL_SERVICES_FILE"), "External services definition file")
 }
 
 var scenarioFile string
+var externalServicesFile string
+
+var (
+  ErrLoadingRules = errors.New("unable to read rules file")
+)
 
 var scenarioCmd = &cobra.Command{
   Use:   "scenario",
   Short: "Run and evaluate a submt scenario",
   Long:  `Evaluate a submit scenario`,
-  Run: func(cmd *cobra.Command, args []string) {
+  RunE: func(cmd *cobra.Command, args []string) error {
     studyRules, err := loadStudyRules()
     if(err != nil) {
-      log.Fatalf("Unable to read rules : %s", err)
+      return errors.Join(ErrLoadingRules, err)
     }
 
+    externalServices, err := evaluator.ReadExternalServicesFromYaml(externalServicesFile)
+      
+    if(err != nil) {
+      return errors.Join(fmt.Errorf("unable to read '%s'", externalServicesFile), err)
+    }
+  
     scenarios, err := scenario.Load(scenarioFile)
     if(err != nil) {
-      fmt.Println("Error loading scenarios in %s :", scenarioFile,  err)
-      return
+      return errors.Join(fmt.Errorf("error loading scenarios in '%s'", scenarioFile), err)
     }
     
-    for idx, scenario := range scenarios {
-      result := scenario.Run(studyRules)
-      fmt.Printf("Scenario %d %s\n", idx, scenario.Label)
-      scenario.PrintResult(result)  
+    for idx, sc := range scenarios {
+      result := sc.Run(studyRules, externalServices)
+      fmt.Printf("Scenario %d %s\n", idx, sc.Label)
+      sc.PrintResult(result)  
     }
-    
+    return nil
   },
 }

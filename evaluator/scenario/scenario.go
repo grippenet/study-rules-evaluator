@@ -86,13 +86,16 @@ func (sc *Scenario) Init() error {
 	return nil
 }
 
-func (sc *Scenario) Run(studyRules []types.Expression) *ScenarioResult {
+func (sc *Scenario) Run(studyRules []types.Expression, ExternalServiceConfigs []types.ExternalService) *ScenarioResult {
 	state := sc.State
 	result := &ScenarioResult{Count: len(sc.Submits), Submits: make([]ScenarioSubmitResult, 0, len(sc.Submits))}
 
 	dbService := engine.NewMemoryDBService()
 
 	evaluator := engine.NewRuleEvaluator(dbService, studyRules)
+	if(len(ExternalServiceConfigs) > 0) {
+		evaluator.WithExternalServices(ExternalServiceConfigs)
+	}
 	//evaluator.Verbose = true
 	
 	now := sc.startTime
