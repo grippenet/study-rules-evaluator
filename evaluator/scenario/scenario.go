@@ -14,7 +14,6 @@ import(
 	"github.com/grippenet/study-rules-evaluator/evaluator/engine"
 	"github.com/grippenet/study-rules-evaluator/evaluator/response"
 	"github.com/grippenet/study-rules-evaluator/evaluator/change"
-	"github.com/expr-lang/expr"
 )
 
 func readScenarioFromJSON(file string) ([]Scenario, error) {
@@ -63,33 +62,6 @@ func initScenario(scenario *Scenario, dir string) error {
 	}
 	err := scenario.Init()
 	return err
-}
-
-type AssertionEnv struct {
-	state types.ParticipantState
-	previousState types.ParticipantState
-	reports map[string]types.Report
-	submitAt time.Time
-}
-
-func evalAssertion(assertion string, data AssertionEnv) (bool, error) {
-	
-	env := map[string]any {
-		"previousState": data.previousState,
-		"state": data.state,
-		"reports": data.reports,
-		"submitAt": data.submitAt,
-	}
-	
-	program, err := expr.Compile(assertion, expr.Env(env), expr.AsBool())
-	if err != nil {
-		return false, err
-	}
-	output, err := expr.Run(program, env)
-	if err != nil {
-		return false, err
-	}
-	return output.(bool), nil
 }
 
 // Init parse & performs checks before the scenario is run
@@ -169,10 +141,10 @@ func (sc *Scenario) Run(studyRules []types.Expression) *ScenarioResult {
 			state = last.Data.PState
 
 			assertionEnv := AssertionEnv{
-				state: state, 
-				previousState: previousState,
-				reports: last.Data.ReportsToCreate,
-				submitAt: now,
+				State: state, 
+				PreviousState: previousState,
+				Reports: last.Data.ReportsToCreate,
+				SubmitAt: now,
 			}
 			
 			submitResult.Asserts = make([]AssertionResult, 0, len(submit.Assertions))
