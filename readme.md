@@ -3,8 +3,9 @@
 Study rules evaluator is a library and a command line tool to evaluate study rules against prepared survey submissions and test the participant state changes.
 For now only participant flags is handled and only one single participant (virtual one) is considered.
 
-## 
+## Scenario file
 
+A scenario file, is a json file containing a list of Scenario
 
 ## Scenario
 
@@ -18,7 +19,8 @@ It's composed of :
 - `submits`: List of surveys submissions
 
 ```json
-{
+[
+    {
     "time": "2024-11-04 12:00:00",
         "label": "Scenario label (shown in results)",
         "state": {
@@ -27,15 +29,15 @@ It's composed of :
         "submits": [
 
         ]
-}
-
+    }
+]
 ```
 
 Each Survey Submission, has :
 
-- One survey response in `file`  or embedded using `data` entry
-- A set of assertions 
-- An optional time to override (or set) the submission time 
+- One survey response in `file`  or embedded using `data` entry, expecting a Survey Response, conforming to [SurveyResponse type](https://github.com/influenzanet/study-service/blob/master/pkg/types/survey-response.go)
+- A set of assertions using the expression language provided by [go-expr](https://expr-lang.org/)
+- An optional `time` to override the submission time or shift it from the previous submission time
 
 File path are relative to the scenario file itself.
 
@@ -71,7 +73,7 @@ Relative time shift from the last submission time
 "time": {
     "duration": "1h",
     "days": 1,
-    "weeks: 0
+    "weeks": 0
 }
 ```
 
@@ -88,10 +90,17 @@ assertion expression must return a boolean value
 When an assertion is evaluated, variables are availbles:
 - `state` : the participant state after submissions are applied
 - `previousState` : the participant state before the submissions are applied
+- `reports` : map of reports created (indexed by report key) by applying the rules
+- `submitedAt` : time used for submission
+
+Some helpers functions are available in the expression
+
+- `HasReport(reportKey, key)`: To test if a report with reportKey, optionaly with a data with key (if key is an empty string data are not checked)
 
 For example, the following tests for existence of entry 'bg1' in flags after submission.
 ````
     'bg1' in state.Flags
+
 ```
 
 Example:
