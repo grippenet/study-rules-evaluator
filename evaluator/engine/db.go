@@ -67,7 +67,7 @@ func (m MemoryDBService) FindSurveyResponses(instanceID string, studyKey string,
 
 	// Sort in reverse order of submission time
 	sort.SliceStable(selecteData, func(i,j int) bool {
-		return selecteData[i].SubmittedAt > selecteData[i].SubmittedAt
+		return selecteData[i].SubmittedAt > selecteData[j].SubmittedAt
 	})
 
 	n := len(selecteData)
