@@ -14,10 +14,12 @@ func init() {
   rootCmd.AddCommand(scenarioCmd)
   scenarioCmd.Flags().StringVar(&scenarioFile, "file", "", "Scenario file")
   scenarioCmd.Flags().StringVar(&externalServicesFile, "externals", os.Getenv("EXTERNAL_SERVICES_FILE"), "External services definition file")
+  scenarioCmd.Flags().BoolVar(&scenarioVerbose, "verbose", false, "Verbose mode")
 }
 
 var scenarioFile string
 var externalServicesFile string
+var scenarioVerbose bool
 
 var (
   ErrLoadingRules = errors.New("unable to read rules file")
@@ -44,9 +46,14 @@ var scenarioCmd = &cobra.Command{
       return errors.Join(fmt.Errorf("error loading scenarios in '%s'", scenarioFile), err)
     }
     
+    if(scenarioVerbose) {
+      fmt.Println("Using verbose mode")
+    }
+
     for idx, sc := range scenarios {
+      sc.SetVerbose(scenarioVerbose)
       result := sc.Run(studyRules, externalServices)
-      fmt.Printf("Scenario %d %s\n", idx, sc.Label)
+      fmt.Printf("Scenario %d %s %t\n", idx, sc.Label, scenarioVerbose)
       sc.PrintResult(result)  
     }
     return nil
