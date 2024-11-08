@@ -118,7 +118,7 @@ func (sc *Scenario) Run(studyRules []types.Expression, ExternalServiceConfigs []
 		submitError := false
 		
 		fmt.Printf("= Submit %d '%s' at %s\n", idx, submit.Response.Key, now)
-		fmt.Println(sc.verbose)
+		
 		if(sc.verbose) {
 			response.Print(*submit.Response)
 		}
