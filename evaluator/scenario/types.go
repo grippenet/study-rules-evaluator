@@ -3,7 +3,6 @@ package scenario
 import(
 	"time"
 	"github.com/influenzanet/study-service/pkg/types"
-	"github.com/grippenet/study-rules-evaluator/evaluator/response"
 )
 
 // TimeRefSpec hold time reference in scenario
@@ -19,11 +18,10 @@ type TimeRefSpec struct {
 }
 
 type SubmitResponse struct {
-	Data *response.JsonSurveyResponse `json:"data"`
 	File string `json:"file"`
 	TimeSpec *TimeRefSpec `json:"time"`
 	FillingDuration int `json:"filling"` // Number of seconds spends by the user to fill & send the survey
-	Response *types.SurveyResponse
+	Response *types.SurveyResponse `json:"data"`
 	Assertions []string `json:"asserts"`
 	timeRef TimeRef // parsed TimeReference
 }
@@ -34,6 +32,7 @@ type Scenario struct {
 	State  types.ParticipantState `json:"state"`
 	Submits []SubmitResponse `json:"submits"`
 	startTime time.Time // parsed Time
+	verbose bool
 }
 
 type TimeRef interface {

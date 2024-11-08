@@ -45,16 +45,16 @@ func Load(file string) ([]Scenario, error) {
 func initScenario(scenario *Scenario, dir string) error {
 	for i, _ := range scenario.Submits {
 		sb := &scenario.Submits[i]
-		if(sb.Data != nil) {
-			sb.Response = response.ToSurveyResponse(*sb.Data)
-		}
 		if(sb.File != "") {
+			if(sb.Response != nil) {
+				return errors.New("Cannot provide `file` and `data` field, cannot choice")
+			}
 			fn := filepath.Join(dir, sb.File)
 			data, err := response.ReadSurveyResponseFromJSON(fn)
 			if err != nil {
 				return errors.Join(fmt.Errorf("Error loading file in submit %d", i), err)
 			}
-			sb.Response = response.ToSurveyResponse(data)
+			sb.Response = &data
 		}
 		if(sb.Response == nil) {
 			return fmt.Errorf("No response provided for submit %d", i)
@@ -86,6 +86,10 @@ func (sc *Scenario) Init() error {
 	return nil
 }
 
+func (sc *Scenario) SetVerbose(v bool) {
+	sc.verbose = v
+} 
+
 func (sc *Scenario) Run(studyRules []types.Expression, ExternalServiceConfigs []types.ExternalService) *ScenarioResult {
 	state := sc.State
 	result := &ScenarioResult{Count: len(sc.Submits), Submits: make([]ScenarioSubmitResult, 0, len(sc.Submits))}
@@ -114,6 +118,10 @@ func (sc *Scenario) Run(studyRules []types.Expression, ExternalServiceConfigs []
 		submitError := false
 		
 		fmt.Printf("= Submit %d '%s' at %s\n", idx, submit.Response.Key, now)
+		fmt.Println(sc.verbose)
+		if(sc.verbose) {
+			response.Print(*submit.Response)
+		}
 
 		u := now.Unix()
 		submit.Response.OpenedAt = u - int64(submit.FillingDuration)
