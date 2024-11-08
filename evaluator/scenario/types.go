@@ -3,6 +3,7 @@ package scenario
 import(
 	"time"
 	"github.com/influenzanet/study-service/pkg/types"
+	"github.com/grippenet/study-rules-evaluator/evaluator/engine"
 )
 
 // TimeRefSpec hold time reference in scenario
@@ -57,7 +58,8 @@ type ScenarioSubmitResult struct {
 	Asserts []AssertionResult `json:"assertions"`
 	State *types.ParticipantState // Final state of participant
 	Reports map[string]types.Report `json:"reports"` // Reports created after the submission
-	FlagsChanges map[string]int
+	FlagsChanges map[string]int `json:"flags_changes"`
+	DebugMessages []engine.DebugMessage `json:"debug_messages"`
 }
 
 type ScenarioError struct {

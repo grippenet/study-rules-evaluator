@@ -139,6 +139,9 @@ func (sc *Scenario) Run(studyRules []types.Expression, ExternalServiceConfigs []
 			}
 			submitError = true
 		}
+
+		submitResult.DebugMessages = evalResult.CollectDebug()
+
 		if(!submitError) {
 			last := evalResult.Last()
 
@@ -148,6 +151,7 @@ func (sc *Scenario) Run(studyRules []types.Expression, ExternalServiceConfigs []
 			flagsChanges := change.CompareMap(state.Flags, last.Data.PState.Flags)
 
 			submitResult.FlagsChanges = flagsChanges
+			
 
 			state = last.Data.PState
 
@@ -200,6 +204,10 @@ func (sc *Scenario) PrintResult(r *ScenarioResult) {
 		if(len(submit.Asserts) > 0) {
 			fmt.Println("  Assertions")
 			printAssertions(submitDef.Assertions, submit.Asserts, indent)
+		}
+		if(len(submit.DebugMessages) > 0) {
+			fmt.Println("  Debug messages")
+			printDebugMessages(submit.DebugMessages, indent)
 		}
 	}
 }
@@ -270,5 +278,12 @@ func printAssertions(definitions []string, asserts []AssertionResult, indent int
 			}
 			color.New(col).Printf("%s- `%s` = %t\n", prefix, def, r.Ok)
 		}
+	}
+}
+
+func printDebugMessages(messages []engine.DebugMessage, indent int) {
+	prefix := strings.Repeat(" ", indent)
+	for _, m := range messages {
+		fmt.Printf("%s- Rule %d : %s\n", prefix, m.Index, m.Message)
 	}
 }

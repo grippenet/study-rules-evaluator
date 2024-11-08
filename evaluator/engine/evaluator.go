@@ -61,6 +61,7 @@ func (ev *RuleEvaluator) Submit(initialState types.ParticipantState, response ty
 
 	for index, rule := range ev.Rules {
 
+		// Capture debug messages
 		var logBuffer bytes.Buffer
 		l := log.New(&logBuffer, "", 0)
 
@@ -83,10 +84,6 @@ func (ev *RuleEvaluator) Submit(initialState types.ParticipantState, response ty
 		}
 
 		r.Debug = logBuffer.String()
-
-		if(r.Debug != "") {
-			fmt.Println(r.Debug)
-		}
 
 		results = append(results, r )
 
